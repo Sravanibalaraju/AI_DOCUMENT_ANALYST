@@ -1,8 +1,8 @@
 import streamlit as st
 import google.generativeai as genai
 from dotenv import load_dotenv
-import os
 from pypdf import PdfReader
+import os
 
 # =========================
 # Load API Key
@@ -18,10 +18,11 @@ if not api_key:
 genai.configure(api_key=api_key)
 
 # =========================
-# Streamlit Config
+# Page Config
 # =========================
 st.set_page_config(
     page_title="AI Document Analyst",
+    page_icon="📄",
     layout="wide"
 )
 
@@ -31,87 +32,112 @@ st.set_page_config(
 if "history" not in st.session_state:
     st.session_state.history = []
 
+if "pdf_text" not in st.session_state:
+    st.session_state.pdf_text = ""
+
 # =========================
 # Header
 # =========================
-st.title("📄 AI Document Analyst")
-st.write("Upload any PDF and ask questions")
+st.markdown(
+    """
+    <h1 style='text-align:center;color:#4CAF50;'>
+        📄 AI Document Analyst
+    </h1>
+
+    <h4 style='text-align:center;'>
+        Upload Any PDF and Ask Questions
+    </h4>
+    <hr>
+    """,
+    unsafe_allow_html=True
+)
 
 # =========================
 # Sidebar
 # =========================
-st.sidebar.title("📄 AI Document Analyst")
+st.sidebar.title("📌 AI Document Analyst")
+
+st.sidebar.success("✅ PDF Question Answering")
+st.sidebar.success("✅ Document Summary")
+st.sidebar.success("✅ AI Analysis")
 
 if st.sidebar.button("🗑 Clear Chat"):
     st.session_state.history = []
     st.rerun()
 
-st.sidebar.success("✅ Gemini Connected")
-
 # =========================
 # Upload PDF
 # =========================
 uploaded_file = st.file_uploader(
-    "Upload PDF",
+    "📂 Upload PDF",
     type=["pdf"]
 )
 
-pdf_text = ""
+if uploaded_file:
 
-if uploaded_file is not None:
+    reader = PdfReader(uploaded_file)
 
-    try:
-        pdf_reader = PdfReader(uploaded_file)
+    text = ""
 
-        for page in pdf_reader.pages:
-            text = page.extract_text()
+    for page in reader.pages:
+        page_text = page.extract_text()
 
-            if text:
-                pdf_text += text
+        if page_text:
+            text += page_text
 
-        st.success("✅ PDF Uploaded Successfully")
+    st.session_state.pdf_text = text
 
-    except Exception as e:
-        st.error(f"Error Reading PDF: {e}")
+    st.success("✅ PDF Uploaded Successfully")
 
 # =========================
-# Quick Buttons
+# Quick Actions
 # =========================
 st.subheader("⚡ Quick Actions")
 
-c1, c2, c3 = st.columns(3)
+col1, col2, col3 = st.columns(3)
 
-with c1:
-    if st.button("📄 Summary"):
-        st.session_state["query"] = "Summarize this document"
+with col1:
+    summary_btn = st.button("📄 Summary")
 
-with c2:
-    if st.button("📊 Key Points"):
-        st.session_state["query"] = "List key points"
+with col2:
+    keypoints_btn = st.button("📌 Key Points")
 
-with c3:
-    if st.button("📋 Report"):
-        st.session_state["query"] = "Generate a professional report"
+with col3:
+    report_btn = st.button("📊 Report")
 
 # =========================
 # Question Input
 # =========================
 query = st.text_input(
-    "Ask a Question",
-    value=st.session_state.get("query", "")
+    "💬 Ask a Question"
 )
 
 # =========================
-# Submit Button
+# Button Logic
 # =========================
-submit = st.button("🚀 Submit")
+submit = False
+
+if summary_btn:
+    query = "Summarize this document"
+    submit = True
+
+elif keypoints_btn:
+    query = "List key points from this document"
+    submit = True
+
+elif report_btn:
+    query = "Generate a professional report"
+    submit = True
+
+elif st.button("🚀 Submit"):
+    submit = True
 
 # =========================
 # Generate Answer
 # =========================
 if submit:
 
-    if uploaded_file is None:
+    if st.session_state.pdf_text == "":
         st.warning("Please upload a PDF first")
 
     elif query.strip() == "":
@@ -119,7 +145,7 @@ if submit:
 
     else:
 
-        with st.spinner("🤖 Generating Answer..."):
+        with st.spinner("🤖 Analyzing Document..."):
 
             try:
 
@@ -128,19 +154,19 @@ if submit:
                 )
 
                 prompt = f"""
-You are an intelligent PDF assistant.
-
-Answer ONLY using the document content below.
-
-If the answer is not available in the document,
-say:
-Information not found in document.
+You are an AI Document Analyst.
 
 DOCUMENT:
-{pdf_text[:5000]}
+{st.session_state.pdf_text[:1500]}
 
 QUESTION:
 {query}
+
+Answer only from the document.
+
+If information is not available,
+reply:
+Information not found in document.
 """
 
                 response = model.generate_content(prompt)
@@ -155,7 +181,7 @@ QUESTION:
                 )
 
             except Exception as e:
-                st.error(str(e))
+                st.error(f"Error: {e}")
 
 # =========================
 # Chat History
@@ -167,11 +193,22 @@ if st.session_state.history:
     for item in reversed(st.session_state.history):
 
         st.markdown(
-            f"### 🙋 Question\n{item['question']}"
-        )
+            f"""
+### 🙋 Question
+{item['question']}
 
-        st.markdown(
-            f"### 🤖 Answer\n{item['answer']}"
+### 🤖 Answer
+{item['answer']}
+"""
         )
 
         st.markdown("---")
+
+# =========================
+# Footer
+# =========================
+st.markdown("---")
+
+st.caption(
+    "🚀 Built with Streamlit + Gemini AI"
+)
